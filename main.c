@@ -13,102 +13,13 @@ void show_banner(void){
  * help
  */
 void show_usage(void){
-	printf("Usage: %s [interface]\n", APP_NAME);
+	printf("Usage: %s", APP_NAME);
 	printf("\n");
 	printf("Options:\n");
-	printf("    interface    Listen on <interface> for packets.\n");
+	printf("-i  listen on <interface> for packets.\n");
+	printf("-p  listen on redis port.\n");
+	printf("-m  max value by byte, greater then it will be printed.\n");
 	printf("\n");
-	return;
-}
-
-/*
- * print data in rows of 16 bytes: offset   hex   ascii
- *
- * 00000   47 45 54 20 2f 20 48 54  54 50 2f 31 2e 31 0d 0a   GET / HTTP/1.1..
- */
-void print_hex_ascii_line(const u_char *start_addr, int len, int completed){
-
-	int i;
-	int gap;
-	const u_char *ch;
-
-	/* offset */
-	printf("%05d   ", completed);
-	
-	/* hex */
-	ch = start_addr;
-	for(i = 0; i < len; i++) {
-		printf("%02x ", *ch);
-		ch++;
-		/* print extra space after 8th byte for visual aid */
-		if (i == 7)
-			printf(" ");
-	}
-	/* print space to handle line less than 8 bytes */
-	if (len < 8)
-		printf(" ");
-	
-	/* fill hex gap with spaces if not full line */
-	if (len < 16) {
-		gap = 16 - len;
-		for (i = 0; i < gap; i++) {
-			printf("   ");
-		}
-	}
-	printf("   ");
-	
-	/* ascii (if printable) */
-	ch = start_addr;
-	for(i = 0; i < len; i++) {
-		if (isprint(*ch))
-			printf("%c", *ch);
-		else
-			printf(".");
-		ch++;
-	}
-
-	printf("\n");
-
-return;
-}
-
-/*
- * deal packet payload data
- */
-void deal_payload(const u_char *payload, int len){
-	/**
-	 * |>>>>>>>>>>|>>>>>>>>>>|>>>>>>>>>>|...........|......|
-	 * |					start_addr->|---skip----|-skip-|
-	 * |<------------completed--------->|<------left------>|
-	 * |line_width|
-	 */
-
-	int left = len;
-	int line_width = 16;
-	int skip;
-	int completed = 0;
-	const u_char *start_addr = payload;
-
-	if (len <= 0)
-		return;
-	if (len <= line_width) {
-		print_hex_ascii_line(start_addr, len, completed);
-		return;
-	}
-
-	for ( ;; ) {
-		skip = line_width % left;
-		print_hex_ascii_line(start_addr, skip, completed);
-		left = left - skip;
-		start_addr = start_addr + skip;
-		completed = completed + line_width;
-		if (left <= line_width) {
-			skip = left;
-			print_hex_ascii_line(start_addr, skip, completed);
-			break;
-		}
-	}
-
 	return;
 }
 
