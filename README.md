@@ -19,6 +19,10 @@
 
 			redis-value-monitor -m 10	
 
+## Install
+
+* In order to install this project, libpcap(download from http://www.tcpdump.org/) should be installed first. Before install libpcap, m4(like m4-1.4.13), bison(bison-2.4) and flex(flex-2.5.35) should be downloaded and installed. You may find them in http://ftp.gnu.org/gnu/.
+
 ## License
 
 Copyright (c) 2014-2015, Peiyuan Feng <fengpeiyuan@gmail.com>.
