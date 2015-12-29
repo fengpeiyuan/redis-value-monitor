@@ -15,7 +15,7 @@
   Following commend is sample for this 
 	
 			redis-value-monitor -p 6379	
-* Use -m(or --maxvalue) option to set amount, more then this value will be printed. 
+* Use -m(or --maxvalue) option to set amount(byte), more then this value will be printed. 
 
 			redis-value-monitor -m 10	
 
