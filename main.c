@@ -335,7 +335,6 @@ int main(int argc, char **argv)
 	 struct bpf_program fp;			/* compiled filter program (expression) */
 	 bpf_u_int32 mask;			/* subnet mask */
 	 bpf_u_int32 net;			/* ip */
-	 int num_packets = 10;			/* number of packets to capture */
 
 	 show_banner();
 
@@ -378,7 +377,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	pcap_loop(handle, num_packets, pop_packet, NULL);
+	pcap_loop(handle, -1, pop_packet, NULL);
 
 	pcap_freecode(&fp);
 	pcap_close(handle);
