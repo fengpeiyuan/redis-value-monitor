@@ -1,7 +1,6 @@
 # Redis Value Monitor 
 
 * Frequent bigger redis value will block network IO, how to monitor?
-* Besides 'strlen(only string support)' and 'debug object(cannot be used in lua)', no other command to show value infomation.
 * The redis-cli --bigkeys using strlen, hlen, llen, scard, zcard commands which return length not size.
 * The 'debug object' command can show value infomation, but cannot be used in lua script.
 * Here we sniffe network card using pcap. 
