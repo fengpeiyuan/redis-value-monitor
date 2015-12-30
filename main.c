@@ -41,6 +41,8 @@ void print_line(const u_char *start,int len){
  * parse redis write command protocal
  */
 void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, char *dst_ip, int src_port, int dst_port,int value_max_len){
+	/*print_line(payload,payload_len);
+	printf("\n");*/
 	const u_char *start = payload;
 	int count_len = 0;
 	const u_char *cmd;
@@ -49,6 +51,8 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 	int key_len = 0;
 	int value_len = 0;
 	int parse_len = 0;
+	int part_len = 0;
+	int i = 0;
 	if(*start++ == '*'){
 		parse_len ++;
 		/*parse count*/
@@ -66,69 +70,54 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 		start += 2; /*add 2 means add \r\n 2 char, no other value char skip */
 		parse_len += 2;
 
-		/*cmd parse*/
-		if(*start++ == '$'){
-			parse_len ++;
-			while(*start != '\r'){
-					if(*start >= '0' && *start <= '9'){
-						cmd_len = (cmd_len * 10) + (*start - '0');
-					}
-					start ++;
-					parse_len ++;
-			}
-			if(parse_len >= payload_len){
-				printf("Error! cmd parse lengh:%d,payload lengh:%d",parse_len,payload_len);
-				return;
-			}
-			start += (cmd_len + 2); /*add 2 pair of '\r\n' */
-			cmd = start;
-			start += (cmd_len + 2);
-			parse_len += (cmd_len + 4);
-
-		}
-
-		/*key parse*/
-		if(*start++ == '$'){
-			parse_len ++;
-			while(*start != '\r'){
-					if(*start >= '0' && *start <= '9'){
-						key_len = (key_len * 10) + (*start - '0');
-					}
-					start ++;
-					parse_len ++;
-			}
-			if(parse_len>=payload_len){
-				printf("Error! key parse lengh:%d,payload lengh:%d",parse_len,payload_len);
-				return;
-			}
-			start += (key_len + 2); /* add 2 pair of '\r\n' */
-			key = start;
-			start += (key_len + 2);
-			parse_len += (key_len + 4);
-
-		}
-
-		/*value parse*/
-		if(*start++ == '$'){
-			parse_len ++;
-			while(*start != '\r'){
-				if(*start >= '0' && *start <= '9'){
-					value_len = (value_len * 10) + (*start - '0');
-				}
-				start ++;
+		for(i=0;i<count_len;i++){
+			/*cmd parse*/
+			if(*start++ == '$'){
 				parse_len ++;
+				while(*start != '\r'){
+						if(*start >= '0' && *start <= '9'){
+							part_len = (part_len * 10) + (*start - '0');
+						}
+						start ++;
+						parse_len ++;
+				}
+
+				start += 2; /*add 2 char of '\r\n' */
+				if(i==0){
+					cmd_len = part_len;
+					cmd = start;
+					/*printf("cmd:%c \n",*cmd);*/
+				}else if(i==1){
+					key_len = part_len;
+					key = start;
+					/*printf("key:%c \n",*key);*/
+				}else if(i==2){
+					value_len = part_len;
+				}
+
+				start += (part_len + 2); /*add 2 char of '\r\n' */
+				parse_len += (part_len + 4);
+				if(parse_len >= payload_len){
+						printf("Error! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+						return;
+				}
+
+				/*clear everytime*/
+				part_len = 0;
+
 			}
 
 		}
-	}
+		/*print*/
+		if(value_len >= value_max_len){
+				/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
+				printf("%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
+				print_line(cmd,cmd_len);
+				printf(" ");
+				print_line(key,key_len);
+				printf("\n");
+		}
 
-	if(value_len >= value_max_len){
-		/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
-		printf("%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
-		print_line(cmd,cmd_len);
-		printf(" ");
-		print_line(key,key_len);
-		printf("\n");
 	}
 
 	return;
