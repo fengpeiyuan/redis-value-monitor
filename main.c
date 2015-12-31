@@ -97,8 +97,9 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 
 				start += (part_len + 2); /*add 2 char of '\r\n' */
 				parse_len += (part_len + 4);
+
 				if(parse_len >= payload_len){
-						printf("Error! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+						/*printf("End of this payload! parse lengh:%d,payload lengh:%d",parse_len,payload_len);*/
 						return;
 				}
 
