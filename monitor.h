@@ -13,6 +13,11 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <getopt.h>
+#include <ifaddrs.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <net/if.h>
 
 int opt=0;
 int options_index=0;

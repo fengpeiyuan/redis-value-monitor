@@ -45,14 +45,19 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 	printf("\n");*/
 	const u_char *start = payload;
 	int count_len = 0;
-	const u_char *cmd;
+	const u_char *cmd = NULL;
 	int cmd_len = 0;
-	const u_char *key;
+	const u_char *key = NULL;
 	int key_len = 0;
-	int value_len = 0;
 	int parse_len = 0;
 	int part_len = 0;
 	int i = 0;
+	char *cmd_set = "SET";
+	char *cmd_hset = "HSET";
+
+	if(payload_len>SNAP_LEN || payload_len<=0)
+		return;
+	/*parse*/
 	if(*start++ == '*'){
 		parse_len ++;
 		/*parse count*/
@@ -63,66 +68,147 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 			start ++;
 			parse_len ++;
 		}
+		if(count_len<=1)
+			return;
 		if(parse_len >= payload_len){
 			fprintf(stderr, "Error! count parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+			print_line(payload,payload_len);
+			fprintf(stderr,"\n");
 			return;
 		}
 		start += 2; /*add 2 means add \r\n 2 char, no other value char skip */
 		parse_len += 2;
 
-		for(i=0;i<count_len;i++){
-			/*cmd parse*/
-			if(*start++ == '$'){
+		/*cmd parse*/
+		if(*start++ == '$'){
+			parse_len ++;
+			while(*start != '\r'){
+				if(*start >= '0' && *start <= '9'){
+					cmd_len = (cmd_len * 10) + (*start - '0');
+				}
+				start ++;
 				parse_len ++;
-				while(*start != '\r'){
-						if(*start >= '0' && *start <= '9'){
-							part_len = (part_len * 10) + (*start - '0');
-						}
-						start ++;
-						parse_len ++;
-				}
+			}
+			if(cmd_len<=0)
+				return;
 
-				start += 2; /*add 2 char of '\r\n' */
-				if(i==0){
-					cmd_len = part_len;
-					cmd = start;
-					/*printf("cmd:%c \n",*cmd);*/
-				}else if(i==1){
-					key_len = part_len;
-					key = start;
-					/*printf("key:%c \n",*key);*/
-				}else if(i==2){
-					value_len = part_len;
-				}
+			start += 2; /*add 2 char of '\r\n' */
+			cmd = start;
+			/*printf("cmd:%c \n",*cmd);*/
+			start += (cmd_len + 2); /*add 2 char of '\r\n' */
+			parse_len += (cmd_len + 4);
 
-				start += (part_len + 2); /*add 2 char of '\r\n' */
-				parse_len += (part_len + 4);
+			/*only these cmd be parsed, other return
+			printf("cmd:%d",strncmp((const char *)cmd,cmd_set,cmd_len));*/
+			if(strncmp((const char *)cmd,cmd_set,cmd_len) != 0 &&
+			   strncmp((const char *)cmd,cmd_hset,cmd_len) != 0
+			)
+				return;
 
-				if(parse_len >= payload_len){
-						/*printf("End of this payload! parse lengh:%d,payload lengh:%d",parse_len,payload_len);*/
-						return;
-				}
 
-				/*clear everytime*/
-				part_len = 0;
-
+			/*length check*/
+			if(parse_len >= payload_len || parse_len <= 0){
+					fprintf(stderr,"End of this payload in cmd parse! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+					print_line(payload,payload_len);
+					fprintf(stderr,"\n");
+					return;
 			}
 
 		}
-		/*print*/
-		if(value_len >= value_max_len){
-				/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
-				fprintf(stdout, "%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
-				print_line(cmd,cmd_len);
-				fprintf(stdout, "	");
-				print_line(key,key_len);
-				fprintf(stdout, "\n");
+
+
+		/*value,field-value parse*/
+		if(strncmp((const char *)cmd,cmd_set,cmd_len)==0){ /*SET command*/
+			for(i=0;i<count_len-1;i++){
+				if(*start++ == '$'){
+					parse_len ++;
+					int value_len = 0;
+
+					while(*start != '\r'){
+						if(*start >= '0' && *start <= '9'){
+								part_len = (part_len * 10) + (*start - '0');
+						}
+						start ++;
+						parse_len ++;
+					}
+					if(part_len<=0)
+						return;
+
+					start += 2; /*add 2 char of '\r\n' */
+					if(i%2==0){
+						key_len = part_len;
+						key = start;
+						/*printf("key:%c \n",*key);*/
+					}else if(i%2==1){
+						value_len = part_len;
+					}
+					start += (part_len + 2); /*add 2 char of '\r\n' */
+					parse_len += (part_len + 4);
+
+					if(parse_len >= payload_len || parse_len <= 0){
+						/*
+						fprintf(stderr,"End of this payload in value/field-value parse! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+						print_line(payload,payload_len);
+						fprintf(stderr,"\n");
+						*/
+						return;
+					}
+
+					/*clear everytime*/
+					part_len = 0;
+
+					/*print*/
+					if(value_len > value_max_len){
+						/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
+						fprintf(stdout, "%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
+						print_line(cmd,cmd_len);
+						fprintf(stdout, "	");
+						print_line(key,key_len);
+						fprintf(stdout, "\n");
+					}
+
+				}
+
+			}
+
+
+		}else if(strncmp((const char *)cmd,cmd_hset,cmd_len)==0){
+								print_line(cmd,cmd_len);
+								printf("--MSET\n");
 		}
+
+
 
 	}
 
 	return;
 }
+
+char *get_ip_host(){
+	struct ifaddrs *addrs, *tmp;
+	char *lo = "127.0.0.1";
+	int status = getifaddrs(&addrs);
+	if (status != 0){
+	    return NULL;
+	}
+
+	tmp = addrs;
+
+	while (tmp){
+	    if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET) {
+	        struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
+	        if(strncmp(lo,inet_ntoa(pAddr->sin_addr),3)!=0){
+	        	/*printf("###%s\n",inet_ntoa(pAddr->sin_addr));*/
+	        	return inet_ntoa(pAddr->sin_addr);
+	        }
+	    }
+	    tmp = tmp->ifa_next;
+	}
+
+	freeifaddrs(addrs);
+	return NULL;
+}
+
 /*
  * pop packet
  */
@@ -135,6 +221,7 @@ void pop_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	int size_ip;
 	int size_tcp;
 	int size_payload;
+
 	headerethernet = (struct header_ethernet*)(packet);
 	headerip = (struct header_ip*)(packet + SIZE_ETHERNET);
 	size_ip = IP_HL(headerip)*4;
@@ -179,7 +266,7 @@ void pop_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
 	if (size_payload > 0) {
 		/*printf("Payload (%d bytes):\n", size_payload);*/
-		parse_redis_payload(payload, size_payload, inet_ntoa(headerip->ip_src), inet_ntoa(headerip->ip_dst),
+		parse_redis_payload(payload, size_payload, inet_ntoa(headerip->ip_src), get_ip_host(),
 				ntohs(headertcp->th_sport),ntohs(headertcp->th_dport),maxvalue);
 	}
 
@@ -231,7 +318,7 @@ int main(int argc, char **argv)
 	 pcap_t *handle;
 	 char filter_exp[] = "tcp port ";
 	 if(port == NULL){
-		 fprintf(stderr, "Please set port using -p first.\n",errbuf);
+		 fprintf(stderr, "Please set port using -p first.\n");
 		 exit(EXIT_FAILURE);
 	 }
 	 strcat(filter_exp,port);
