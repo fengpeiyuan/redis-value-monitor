@@ -9,13 +9,13 @@ DEPS = -lpcap
 default: $(APP_NAME)
 all:default
 
-$(APP_NAME): main.o
-		$(LINK) -o $(APP_NAME) main.o $(DEPS)
-main.o: main.c
-		$(CC) -c $(CFLAGS) monitor.h main.c 
+$(APP_NAME): monitor.o
+		$(LINK) -o $(APP_NAME) monitor.o $(DEPS)
+monitor.o: monitor.c
+		$(CC) -c $(CFLAGS) monitor.h monitor.c 
 		
 
 install:
 
 clean:
-	rm -f $(APP_NAME) $(APP_NAME).o
+	rm -f $(APP_NAME) monitor.o

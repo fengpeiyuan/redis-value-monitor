@@ -4,8 +4,8 @@
  * banner
  */
 void show_banner(void){
-	printf("%s - %s\n", APP_NAME, APP_DESC);
-	printf("\n");
+	fprintf(stdout,"%s - %s\n", APP_NAME, APP_DESC);
+	fprintf(stdout,"\n");
 	return;
 }
 
@@ -30,9 +30,9 @@ void print_line(const u_char *start,int len){
 	int i;
 	for(i = 0; i < len; i++) {
 			if (isprint(*start))
-				printf("%c", *start);
+				fprintf(stdout, "%c", *start);
 			else
-				printf(".");
+				fprintf(stdout, ".");
 			start++;
 	}
 }
@@ -64,7 +64,7 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 			parse_len ++;
 		}
 		if(parse_len >= payload_len){
-			printf("Error! count parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+			fprintf(stderr, "Error! count parse lengh:%d,payload lengh:%d",parse_len,payload_len);
 			return;
 		}
 		start += 2; /*add 2 means add \r\n 2 char, no other value char skip */
@@ -112,11 +112,11 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 		/*print*/
 		if(value_len >= value_max_len){
 				/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
-				printf("%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
+				fprintf(stdout, "%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
 				print_line(cmd,cmd_len);
-				printf(" ");
+				fprintf(stdout, "	");
 				print_line(key,key_len);
-				printf("\n");
+				fprintf(stdout, "\n");
 		}
 
 	}
@@ -139,7 +139,7 @@ void pop_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	headerip = (struct header_ip*)(packet + SIZE_ETHERNET);
 	size_ip = IP_HL(headerip)*4;
 	if (size_ip < 20) {
-		printf("Invalid IP header length: %u bytes\n", size_ip);
+		fprintf(stderr, "Invalid IP header length: %u bytes\n", size_ip);
 		return;
 	}
 	/*printf("From: %s,To: %s\n", inet_ntoa(headerip->ip_src),inet_ntoa(headerip->ip_dst));
@@ -161,19 +161,22 @@ void pop_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 			return;
 	}*/
 	if(headerip->ip_p != IPPROTO_TCP){
-		printf("Protocal is not TCP, return\n");
+		fprintf(stderr, "Protocal is not TCP, return\n");
 		return;
 	}
 	headertcp = (struct header_tcp*)(packet + SIZE_ETHERNET + size_ip);
 	size_tcp = TH_OFF(headertcp)*4;
 	if (size_tcp < 20) {
-		printf("Invalid TCP header length: %u bytes\n", size_tcp);
+		fprintf(stderr, "Invalid TCP header length: %u bytes\n", size_tcp);
 		return;
 	}
 	/*printf("Src port: %d,Dst port: %d\n", ntohs(headertcp->th_sport),ntohs(headertcp->th_dport));*/
 	payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
 	size_payload = ntohs(headerip->ip_len) - (size_ip + size_tcp);
 	
+	/*fprintf(stderr, "%s,%s",inet_ntoa(headerip->ip_src),inet_ntoa(headerip->ip_dst));
+	*/
+
 	if (size_payload > 0) {
 		/*printf("Payload (%d bytes):\n", size_payload);*/
 		parse_redis_payload(payload, size_payload, inet_ntoa(headerip->ip_src), inet_ntoa(headerip->ip_dst),
@@ -258,6 +261,7 @@ int main(int argc, char **argv)
 	printf("Filter expression: %s\n", filter_exp);*/
 
 	handle = pcap_open_live(interface, SNAP_LEN, 1, 1000, errbuf);
+	/*dev*/
 	if (handle == NULL) {
 		fprintf(stderr, "Couldn't open device %s: %s\n", interface, errbuf);
 		exit(EXIT_FAILURE);
@@ -268,6 +272,7 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
+	/*filter*/
 	if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
 		fprintf(stderr, "Couldn't parse filter %s: %s\n",filter_exp, pcap_geterr(handle));
 		exit(EXIT_FAILURE);
