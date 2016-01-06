@@ -53,7 +53,21 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 	int part_len = 0;
 	int i = 0;
 	char *cmd_set = "SET";
+	char *cmd_mset = "MSET";
+	char *cmd_setnx = "SETNX";
+	char *cmd_getset = "GETSET";
+	char *cmd_lpushx = "LPUSHX";
+	char *cmd_rpushx = "RPUSHX";
+
 	char *cmd_hset = "HSET";
+	char *cmd_hsetnx = "HSETNX";
+	char *cmd_hmset = "HMSET";
+	char *cmd_lset = "LSET";
+	char *cmd_zadd = "ZADD";
+
+	char *cmd_lpush = "LPUSH";
+	char *cmd_sadd = "SADD";
+	char *cmd_rpush = "RPUSH";
 
 	if(payload_len>SNAP_LEN || payload_len<=0)
 		return;
@@ -103,7 +117,20 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 			/*only these cmd be parsed, other return
 			printf("cmd:%d",strncmp((const char *)cmd,cmd_set,cmd_len));*/
 			if(strncmp((const char *)cmd,cmd_set,cmd_len) != 0 &&
-			   strncmp((const char *)cmd,cmd_hset,cmd_len) != 0
+					strncmp((const char *)cmd,cmd_mset,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_setnx,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_getset,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_lpushx,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_rpushx,cmd_len) != 0 &&
+
+					strncmp((const char *)cmd,cmd_hset,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_hsetnx,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_hmset,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_lset,cmd_len) != 0 &&
+
+					strncmp((const char *)cmd,cmd_lpush,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_sadd,cmd_len) != 0 &&
+					strncmp((const char *)cmd,cmd_rpush,cmd_len) != 0
 			)
 				return;
 
@@ -120,7 +147,14 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 
 
 		/*value,field-value parse*/
-		if(strncmp((const char *)cmd,cmd_set,cmd_len)==0){ /*SET command*/
+		/*1.cmd key value, key value*/
+		if(strncmp((const char *)cmd,cmd_set,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_mset,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_setnx,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_getset,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_lpushx,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_rpushx,cmd_len)==0  ){ /*SET,MSET,SETNX ,GETSET,LPUSHX,RPUSHX command*/
+
 			for(i=0;i<count_len-1;i++){
 				if(*start++ == '$'){
 					parse_len ++;
@@ -161,11 +195,6 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 					}
 
 					if(parse_len >= payload_len || parse_len <= 0){
-						/*
-						fprintf(stderr,"End of this payload in value/field-value parse! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
-						print_line(payload,payload_len);
-						fprintf(stderr,"\n");
-						*/
 						return;
 					}
 
@@ -174,10 +203,117 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 
 			}
 
+		/*2.cmd key field value, field value ......*/
+		}else if(strncmp((const char *)cmd,cmd_hset,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_hmset,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_hsetnx,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_zadd,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_lset,cmd_len)==0  ){/*HSET,HMSET,HSETNX,LSET,ZADD command*/
+			for(i=0;i<count_len-1;i++){
+				if(*start++ == '$'){
+					parse_len ++;
+					const u_char *field = NULL;
+					int field_len = 0;
+					int value_len = 0;
 
-		}else if(strncmp((const char *)cmd,cmd_hset,cmd_len)==0){
-								print_line(cmd,cmd_len);
-								printf("--MSET\n");
+					while(*start != '\r'){
+						if(*start >= '0' && *start <= '9'){
+							part_len = (part_len * 10) + (*start - '0');
+						}
+						start ++;
+						parse_len ++;
+					}
+					if(part_len<=0)
+						return;
+
+					start += 2; /*add 2 char of '\r\n' */
+					if(i==0){/*key*/
+						key_len = part_len;
+						key = start;
+					}else if(i%2==1){/*field*/
+						field_len = part_len;
+						field = start;
+						/*printf("field:%c \n",*field);*/
+					}else if(i!=0 && i%2==0){/*value*/
+						value_len = part_len;
+					}
+					start += (part_len + 2); /*add 2 char of '\r\n' */
+					parse_len += (part_len + 4);
+
+					/*clear everytime*/
+					part_len = 0;
+
+					/*print*/
+					if(value_len > value_max_len){
+							/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
+							fprintf(stdout, "%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
+							print_line(cmd,cmd_len);
+							fprintf(stdout, "	");
+							print_line(key,key_len);
+							fprintf(stdout, "	");
+							print_line(field,field_len);
+							fprintf(stdout, "\n");
+					}
+
+					if(parse_len >= payload_len || parse_len <= 0){
+						return;
+					}
+
+				}
+
+			}
+
+		/*3.cmd key value, value ...*/
+		}else if(strncmp((const char *)cmd,cmd_lpush,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_sadd,cmd_len)==0 ||
+				strncmp((const char *)cmd,cmd_rpush,cmd_len)==0  ){/*LPUSH,SADD,RPUSH command*/
+			for(i=0;i<count_len-1;i++){
+				if(*start++ == '$'){
+					parse_len ++;
+					int value_len = 0;
+
+					while(*start != '\r'){
+						if(*start >= '0' && *start <= '9'){
+							part_len = (part_len * 10) + (*start - '0');
+						}
+						start ++;
+						parse_len ++;
+					}
+					if(part_len<=0)
+						return;
+
+					start += 2; /*add 2 char of '\r\n' */
+					if(i==0){/*key*/
+						key_len = part_len;
+						key = start;
+					}else {/*value*/
+						value_len = part_len;
+					}
+					start += (part_len + 2); /*add 2 char of '\r\n' */
+					parse_len += (part_len + 4);
+
+					/*clear everytime*/
+					part_len = 0;
+
+					/*print*/
+					if(value_len > value_max_len){
+							/*printf("count_len:%d,cmd_len:%d,key_len:%d,value_len:%d \n",count_len,cmd_len,key_len,value_len);*/
+							fprintf(stdout, "%s:%d -> %s:%d	%d	",src_ip,src_port,dst_ip,dst_port,value_len);
+							print_line(cmd,cmd_len);
+							fprintf(stdout, "	");
+							print_line(key,key_len);
+							fprintf(stdout, "\n");
+					}
+
+					if(parse_len >= payload_len || parse_len <= 0){
+						return;
+					}
+
+				}
+
+			}
+
+
 		}
 
 
@@ -187,6 +323,10 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 	return;
 }
 
+
+/*
+ *get local ip addr
+ */
 void get_ip_host(char *ip_host){
 	struct ifaddrs *addrs, *tmp;
 	char *lo = "127.0.0.1";
