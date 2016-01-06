@@ -68,16 +68,18 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 			start ++;
 			parse_len ++;
 		}
+		start += 2; /*add 2 means add \r\n 2 char, no other value char skip */
+		parse_len += 2;
+
 		if(count_len<=1)
 			return;
-		if(parse_len >= payload_len){
+		if(parse_len >= payload_len|| parse_len <= 0){
 			fprintf(stderr, "Error! count parse lengh:%d,payload lengh:%d",parse_len,payload_len);
 			print_line(payload,payload_len);
 			fprintf(stderr,"\n");
 			return;
 		}
-		start += 2; /*add 2 means add \r\n 2 char, no other value char skip */
-		parse_len += 2;
+
 
 		/*cmd parse*/
 		if(*start++ == '$'){
@@ -145,15 +147,6 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 					start += (part_len + 2); /*add 2 char of '\r\n' */
 					parse_len += (part_len + 4);
 
-					if(parse_len >= payload_len || parse_len <= 0){
-						/*
-						fprintf(stderr,"End of this payload in value/field-value parse! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
-						print_line(payload,payload_len);
-						fprintf(stderr,"\n");
-						*/
-						return;
-					}
-
 					/*clear everytime*/
 					part_len = 0;
 
@@ -166,6 +159,16 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 						print_line(key,key_len);
 						fprintf(stdout, "\n");
 					}
+
+					if(parse_len >= payload_len || parse_len <= 0){
+						/*
+						fprintf(stderr,"End of this payload in value/field-value parse! parse lengh:%d,payload lengh:%d",parse_len,payload_len);
+						print_line(payload,payload_len);
+						fprintf(stderr,"\n");
+						*/
+						return;
+					}
+
 
 				}
 
@@ -184,29 +187,29 @@ void parse_redis_payload(const u_char *payload, int payload_len, char *src_ip, c
 	return;
 }
 
-char *get_ip_host(){
+void get_ip_host(char *ip_host){
 	struct ifaddrs *addrs, *tmp;
 	char *lo = "127.0.0.1";
 	int status = getifaddrs(&addrs);
 	if (status != 0){
-	    return NULL;
+	    return;
 	}
 
 	tmp = addrs;
-
 	while (tmp){
 	    if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET) {
 	        struct sockaddr_in *pAddr = (struct sockaddr_in *)tmp->ifa_addr;
 	        if(strncmp(lo,inet_ntoa(pAddr->sin_addr),3)!=0){
 	        	/*printf("###%s\n",inet_ntoa(pAddr->sin_addr));*/
-	        	return inet_ntoa(pAddr->sin_addr);
+	        	char *ip = inet_ntoa(pAddr->sin_addr);
+	        	strncpy(ip_host,ip,16);
 	        }
 	    }
 	    tmp = tmp->ifa_next;
 	}
 
 	freeifaddrs(addrs);
-	return NULL;
+	return;
 }
 
 /*
@@ -221,6 +224,8 @@ void pop_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 	int size_ip;
 	int size_tcp;
 	int size_payload;
+	char ip_host[20];
+	memset(ip_host, '\0', sizeof(ip_host));
 
 	headerethernet = (struct header_ethernet*)(packet);
 	headerip = (struct header_ip*)(packet + SIZE_ETHERNET);
@@ -266,7 +271,8 @@ void pop_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
 
 	if (size_payload > 0) {
 		/*printf("Payload (%d bytes):\n", size_payload);*/
-		parse_redis_payload(payload, size_payload, inet_ntoa(headerip->ip_src), get_ip_host(),
+		get_ip_host(ip_host);
+		parse_redis_payload(payload, size_payload, inet_ntoa(headerip->ip_src), ip_host,
 				ntohs(headertcp->th_sport),ntohs(headertcp->th_dport),maxvalue);
 	}
 
