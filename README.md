@@ -19,6 +19,8 @@
 
 			redis-value-monitor -m 10	
 ## Output format
+	* Print like this.
+
 	10.209.10.63:13348 -> 10.209.10.63:10443        14      MGET BRAND_20001613
 	10.209.11.16:36777 -> 10.209.10.63:10443        22      MGET STORE_BRAND_ID_2061660
 	10.209.11.16:36777 -> 10.209.10.63:10443        14      MGET BRAND_10462
